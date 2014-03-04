@@ -22,6 +22,7 @@ Foswiki 1.2.0 introduces a new internal API that supports the parsing and modell
 |  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
 |  Dependencies: | %$DEPENDENCIES% |
 |  Version: | %$VERSION% |
+|  Release: | %$RELEASE% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
 |  1.0.1 (12 Nov 2013): | Correct row numbering |
 |  1.0.0 (29 Aug 2012): | Initial version |
