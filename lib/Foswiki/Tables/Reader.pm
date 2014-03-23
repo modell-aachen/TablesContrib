@@ -21,6 +21,13 @@ use Assert;
 use Foswiki::Attrs          ();
 use Foswiki::Tables::Parser ();
 
+BEGIN {
+    if ( $Foswiki::cfg{UseLocale} ) {
+        require locale;
+        import locale();
+    }
+}
+
 =begin TML
 
 ---++ ClassMethod new($table_class) -> $parser
@@ -74,6 +81,7 @@ spot the tables in the list by doing:
 <verbatim>
 if (UNIVERSAL::isa($line, $table_class)) {
 </verbatim>
+text lines are scalars, so will also return false to =ref($line)=
 
 The =$topicObject= is an instance of Foswiki::Meta, and is required to
 provide an expansion context for macros embedded in parameters. If it
@@ -108,38 +116,57 @@ sub parse {
 # This is recorded as "pending" so it can be applied to the next table read.
 sub early_line {
     my ( $this, $line ) = @_;
-    return 0 unless $this->{meta};
-    return 0 unless $line =~ s/(%$this->{macro}(?:{(.*?)})?%)//s;
+    @{ $this->{waiting} } = ();
 
-    my $spec  = $1;
-    my $as    = $2;
-    my $attrs = Foswiki::Attrs->new(
-        defined $as ? $this->{meta}->expandMacros($as) : '' );
-    push( @{ $this->{result} }, $line ) if $line =~ /\S/;   # other junk on line
+    return 0 unless $this->{meta};
+
+    # Can we get a balanced macro expression from the text?
+    my $args = Foswiki::Attrs::findFirstOccurenceAttrs( $this->{macro}, $line );
+    return 0 unless ( defined $args );
+
+    my $attrs = Foswiki::Attrs->new($args);
+
+    # Remember leading and trailing junk
+    my $ok = $line =~ /^(.*?)(\%$this->{macro}(?:\Q{$args}\E)?%)(.*)$/s;
+    ASSERT($ok) if DEBUG;
+
+    push( @{ $this->{waiting} }, $1 ) if defined($1) && length($1);
+    my $spec = $2;
+    push( @{ $this->{waiting} }, $3 ) if defined($3) && length($3);
 
     my %read = ( $this->{meta}->getPath() => 1 );
+    my $session = $this->{meta}->session;
     while ( $attrs->{include} ) {
         my ( $iw, $it ) =
-          Foswiki::Func::normalizeWebTopicName( $this->{meta}->web,
+          $session->normalizeWebTopicName( $this->{meta}->web,
             $attrs->{include} );
-        unless ( Foswiki::topicExists( $iw, $it ) ) {
+        if ( $session->topicExists( $iw, $it ) ) {
+            if ( $read{"$iw.$it"} ) {
+                $line = CGI::span( { class => 'foswikiAlert' },
+                    "Recursive include of $attrs->{include}" );
+                last;
+            }
+            else {
+                $read{"$iw.$it"} = 1;
+                my $meta = Foswiki::Meta->load( $session, $iw, $it );
+
+               # Replace attrs with the first matching macro in the include text
+               # If there is none, we're done
+                my $params =
+                  Foswiki::Attrs::findFirstOccurenceAttrs( $this->{macro},
+                    $meta->text() );
+                last unless $params;
+                $params = $meta->expandMacros($params);
+                $attrs  = Foswiki::Attrs->new($params);
+
+                # and go around again
+            }
+        }
+        else {
             $line = CGI::span( { class => 'foswikiAlert' },
                 "Could not find format topic $attrs->{include}" );
+            last;
         }
-        if ( $read{"$iw.$it"} ) {
-            $line = CGI::span( { class => 'foswikiAlert' },
-                "Recursive include of $attrs->{include}" );
-        }
-        $read{"$iw.$it"} = 1;
-        my $meta = Foswiki::Meta->load( $this->{meta}->session, $iw, $it );
-        my $params = '';
-        if ( $meta->text =~ m/%$this->{macro}(?:{([^\n]*)})?%/s ) {
-            $params = $1;
-        }
-        if ($params) {
-            $params = $meta->expandMacros($params);
-        }
-        $attrs = Foswiki::Attrs->new($params);
     }
 
     $this->adjustSpec($attrs);
@@ -160,12 +187,15 @@ sub adjustSpec {
 sub line {
     my ( $this, $line ) = @_;
     push( @{ $this->{result} }, $line );
+    push( @{ $this->{result} }, @{ $this->{waiting} } );
 }
 
 # Parser event handler
 sub open_table {
     my ( $this, $line ) = @_;
 
+    push( @{ $this->{result} }, @{ $this->{waiting} } );
+    @{ $this->{waiting} } = ();
     if ( !$this->{pending_spec} ) {
 
         # [ bHasMacro, spec, attrs ]
@@ -183,6 +213,8 @@ sub open_table {
 sub close_table {
     my ($this) = @_;
     push( @{ $this->{result} }, $this->{active_table} );
+    push( @{ $this->{result} }, @{ $this->{waiting} } );
+    @{ $this->{waiting} } = ();
     $this->{active_table}->number( $this->{nTables}++ );
     undef $this->{activeTable};
 }
@@ -217,6 +249,9 @@ sub td {
 # Parser event handler
 sub th {
     td( @_, 1 );
+}
+
+sub end_of_input {
 }
 
 1;

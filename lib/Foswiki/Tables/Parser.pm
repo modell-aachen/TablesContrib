@@ -19,6 +19,13 @@ use Assert;
 
 use constant TRACE => 0;
 
+BEGIN {
+    if ( $Foswiki::cfg{UseLocale} ) {
+        require locale;
+        import locale();
+    }
+}
+
 =begin TML
 
 ---++ StaticMethod parse( $text, \&dispatch )
@@ -66,6 +73,9 @@ Called to create a table cell.
 ---+++ =close_tr($after)=
 Called to close an open table row.
    * =$after= - trailing content (| and spaces)
+
+---+++ =end_of_input()=
+Called at end of all input.
 
 An additional event is provided for those seeking to perform special
 processing of certain lines, including rewriting them.
@@ -133,6 +143,13 @@ sub parse {
                     $in_table = 0;
                     &$dispatch('close_table');
                 }
+
+               #an EDITTABLE macro starts a new table
+               #this allows us to create new tables from just an EDITTABLE macro
+                print STDERR "Open TABLE\n" if TRACE;
+                &$dispatch('open_table');
+                $in_table = 1;
+
                 next LINE;
             }
 
@@ -213,6 +230,7 @@ sub parse {
         print STDERR "Close TABLE (mop-up)\n" if TRACE;
         &$dispatch('close_table');    #
     }
+    &$dispatch('end_of_input');
 }
 
 =begin TML
