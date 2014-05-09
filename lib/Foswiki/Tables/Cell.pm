@@ -12,13 +12,6 @@ Abstract model of a table cell, suitable for use with the tables parser.
 use strict;
 use Assert;
 
-BEGIN {
-    if ( $Foswiki::cfg{UseLocale} ) {
-        require locale;
-        import locale();
-    }
-}
-
 # Default format if no other format is defined for a cell
 my $defCol ||= { type => 'text', size => 20, values => [] };
 
@@ -32,8 +25,7 @@ Construct a new table cell.
    * =$postcruft= - whatever follows the text inside the cell (spaces)
    * =$isHeader= - true if this is a header cell (content delimited by **)
 
-Note that =$postcruft= and =$precruft= should *not* include the * indicating
-a header.
+Note that =$postcruft= and =$precruft= should *not* include the * indicating a header.
 
 =cut
 
@@ -119,7 +111,7 @@ __END__
 
 Author: Crawford Currie http://c-dot.co.uk
 
-Copyright (c) 2009-2014 Foswiki Contributors
+Copyright (c) 2009-2012 Foswiki Contributors
 Portions Copyright (C) 2007 WindRiver Inc. and TWiki Contributors.
 All Rights Reserved. Foswiki Contributors are listed in the
 AUTHORS file in the root of this distribution.

@@ -14,13 +14,6 @@ use Assert;
 
 use Foswiki::Func ();
 
-BEGIN {
-    if ( $Foswiki::cfg{UseLocale} ) {
-        require locale;
-        import locale();
-    }
-}
-
 =begin TML
 
 ---++ ClassMethod new($table, $precruft, $postcruft [, \@cols]) -> $row
@@ -41,11 +34,9 @@ sub new {
     $this->{table} = $table;
     ASSERT( $table->isa('Foswiki::Tables::Table'), $table ) if DEBUG;
     $this->{number} = undef;    # 0-based index of the row in the *raw* table
-        # isHeader and isFooter are calculated based on the headerrows
-        # and footerrow options, if set, when the table is constructed. If they
-        # are not set, the number of rows that qualify as "header rows" is used
-        # to guess the header rows. A row qualifies as a header row if all cells
-        # in the row are marked as header cells.
+      # isHeader and isFooter are calculated based on the headerrows and footerrows
+      # options, if set, or the number of rows that qualify as "header rows" is not. A
+      # row qualifies as a header row if all cells in the row are marked as header cells.
     $this->{isHeader}  = undef;
     $this->{isFooter}  = undef;
     $this->{precruft}  = defined $precruft ? $precruft : '';
@@ -74,8 +65,13 @@ sub cell_class {
     return 'Foswiki::Tables::Cell';
 }
 
-# PACKAGE PRIVATE ObjectMethod pushCell($cellObject) -> $index
-# Add a row to the end of the table.
+=begin TML
+
+---++ ObjectMethod pushCell($cellObject) -> $index
+Add a row to the end of the table.
+
+=cut
+
 sub pushCell {
     my ( $this, $cell ) = @_;
 
@@ -105,16 +101,12 @@ Determine if this row meets the criteria for a header row (or set it as a header
 
 sub isHeader {
     my ( $this, $set ) = @_;
-    if ( defined $set ) {
+    if ($set) {
         $this->{isHeader} = $set;
     }
     elsif ( !defined $this->{isHeader} ) {
-        $this->{isHeader} = 0;
         foreach my $cell ( @{ $this->{cols} } ) {
-            if ( $cell->{isHeader} ) {
-                $this->{isHeader} = 1;
-            }
-            else {
+            unless ( $cell->{isHeader} ) {
                 $this->{isHeader} = 0;
                 last;
             }
@@ -203,7 +195,6 @@ sub setRow {
         }
         else {
             if ( !ref($val) ) {
-                require Foswiki::Tables::Parser;
                 my @cell = Foswiki::Tables::Parser::split_cell($val);
                 $val = \@cell;
             }
@@ -231,7 +222,7 @@ __END__
 
 Author: Crawford Currie http://c-dot.co.uk
 
-Copyright (c) 2009-2014 Foswiki Contributors
+Copyright (c) 2009-2012 Foswiki Contributors
 Portions Copyright (C) 2007 WindRiver Inc. and TWiki Contributors.
 
 All Rights Reserved. Foswiki Contributors are listed in the
